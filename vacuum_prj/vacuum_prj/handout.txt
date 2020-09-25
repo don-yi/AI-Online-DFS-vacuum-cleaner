@@ -1,0 +1,54 @@
+Vacuum-cleaner project
+For this assignment you have to implement a vacuum-cleaner agent. 
+
+The environment for the agent is a rectangular grid containing 
+ walls - marked as #
+ dirt  - marked as *
+ home position - H
+
+Some properties:
+ - cell containing a wall cannot contain any other object
+ - there is no more than one "dirt" in each cell
+ - home position is arbitrary - but not inside a wall
+
+Agent design is completely up to you. See agent.skeleton.cpp and agent.skeleton.h for an example, check definitions.h for notations. 
+Study environment.cpp and environment.h.
+
+Agent start position (home position) and initial heading (orientation) are arbitrary - see file format description.
+
+Actions (possible return values from agent's Move function:
+ - left
+ - right
+ - forward
+ - suck
+ - shutoff
+ - noop
+
+Environment is running in a loop till one of the following happens
+ agent executes shutoff
+ agent performs max_steps (see definitions.h, currently set to 10000)
+
+
+Agents performance is calculated as follows:
+unless agent is "OFF" it's score is 
+ - number of collected dirt multiplied by 20 minus the number of steps (actions)
+   that is if after 125 steps you have collected 7 "dirts" agent's score is 20*7-125 = 15
+ - when agent executes shutoff, it gets additional 1000 points if it's in "home cell".
+
+Percept
+See definitions.h:
+ - dirt - boolean - if there is dirt in this cell
+ - bump - boolean - if agent bumped to a wall during previous move
+ - home boolean - if this is a home position
+
+Environment file format
+Mostly self-explanatory,
+ - # wall
+ - . nothing
+ - * dirt
+ - > agent start/home position, orientation EAST
+ - < agent start/home position, orientation WEST
+ - ^ agent start/home position, orientation NORTH
+ - V agent start/home position, orientation SOUTH
+
+My scores for the first 5 fields: 1070, 993, 1034, 1027, 1127
