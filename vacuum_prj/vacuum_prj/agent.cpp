@@ -13,7 +13,7 @@ Action Agent::GetAction(Percept p) {
   // if dirt suck
   if (p.dirt) return SUCK;
 
-  // if home and done back-tracking, shut off
+  // ending cond: if home and done back-tracking, shut off
   if (
     prevAct == FORWARD
     and p.home
@@ -23,12 +23,80 @@ Action Agent::GetAction(Percept p) {
   // if bumped, ch curr pos to prev
   if (p.bump) currPos = prevPos;
 
-  //++test;
-
   // if brand new pos,
   std::map<std::pair<int, int>, std::stack<Action>>::iterator findIttr;
   findIttr = act.find(currPos);
   if (findIttr == act.end()) {
+    GenDefaultActs();
+    backtrack.push(currPos);
+  }
+
+  // try new pos
+  std::pair<int, int> newPos;
+  if (
+    not act[currPos].empty()
+    and act[currPos].top() == FORWARD
+    and not isBacktracking
+    ) {
+    // get expected new pos
+    Action nextAct = act[currPos].top();
+    newPos = UPCurrPos(currPos);
+
+    // if new pos is already visited and goind fwd
+    findIttr = act.find(newPos);
+    if (nextAct == FORWARD and findIttr != act.end())
+      // skip a foward act
+      act[currPos].pop();
+  }
+
+  // backtrack cond
+  if (act[currPos].empty()) {
+    // ending cond: goal achieved (at home w/o any act's
+    if (p.home) return SHUTOFF;
+    else Backtrack();
+  }
+  // if more traversal after back track (act's not exhausted)
+  else if (isBacktracking and not act[currPos].empty() and canTraverse) {
+    // rotate to original
+    act[currPos].push(RIGHT);
+    act[currPos].push(RIGHT);
+
+    // set bool back
+    isBacktracking = false;
+  }
+
+  // get next act from stack
+  Action nextAct = act[currPos].top();
+  act[currPos].pop();
+
+  // up curr heading
+  if (nextAct == RIGHT) {
+    ++currHead;
+    if (currHead >= SIZE) currHead = CUST_FWD;
+  }
+  else if (nextAct == LEFT) {
+    --currHead;
+    if (currHead <= ERR) currHead = CUST_L;
+  }
+
+  // up priv val's
+  prevPos = currPos;
+  if (nextAct == FORWARD) {
+    if (isBacktracking) {
+      currPos = backtrack.top();
+      canTraverse = true;
+    }
+    else if (newPos != std::make_pair(0, 0))
+      currPos = newPos;
+  }
+  prevAct = nextAct;
+
+  return nextAct;
+}
+
+// gen new acts for new pos found
+void Agent::GenDefaultActs()
+{
     // new possible actions
     std::stack<Action> newAction;
     newAction.push(FORWARD);
@@ -42,105 +110,26 @@ Action Agent::GetAction(Percept p) {
     act.insert(
       std::pair<std::pair<int, int>, std::stack<Action>>(currPos, newAction)
     );
-
-    // push to track back
-    backtrack.push(currPos);
-  }
-
-  // try new pos
-  std::pair<int, int> newPos;
-  if (
-    not act[currPos].empty()
-    and act[currPos].top() == FORWARD
-    and not isBacktracking ) {
-    Action nextAct = act[currPos].top();
-    newPos = UPCurrPos(currPos);
-
-    // if new pos is already visited but not backtracking
-    findIttr = act.find(newPos);
-    if (nextAct == FORWARD and findIttr != act.end())
-      // skip a foward act
-      act[currPos].pop();
-  }
-
-  // 1st time / back to backtrack cond
-  if (act[currPos].empty()) {
-    // goal achieved
-    if (p.home) {
-      return SHUTOFF;
-    }
-    //if (not isBacktracking) {
-      //if (isFirstBacktrack) {
-        //backtrack.pop();
-        //isFirstBacktrack = false;
-      //}
-    //  Backtrack();
-    //}
-    // continuing backtrack cond
-    //else
-      Backtrack();
-    //}
-  }
-  // if more traversal after track back
-  else if (isBacktracking and not act[currPos].empty() and canTraverse) {
-    // rotate to original
-    act[currPos].push(RIGHT);
-    act[currPos].push(RIGHT);
-
-    // set back to is not bactrack
-    isBacktracking = false;
-  }
-
-  // get next act from stack
-  Action nextAct = act[currPos].top();
-  act[currPos].pop();
-
-  // up curr heading
-  if (nextAct == RIGHT) {
-    ++currHeading;
-    if (currHeading >= SIZE) currHeading = F;
-  }
-  if (nextAct == LEFT) {
-    --currHeading;
-    if (currHeading <= ERR) currHeading = NEG;
-  }
-
-  // up priv val's
-  prevPos = currPos;
-  if (nextAct == FORWARD) {
-    if (isBacktracking) {
-      currPos = backtrack.top();
-      canTraverse = true;
-    }
-    else if (newPos != std::make_pair(0, 0)) {
-      //// push to track back
-      //backtrack.push(currPos);
-      currPos = newPos;
-    }
-  }
-  prevAct = nextAct;
-
-  // up prev pos
-  return nextAct;
 }
 
+// get expected new pos w/ fwd act using prev pos and heading
 std::pair<int, int> Agent::UPCurrPos(std::pair<int, int> pos)
 {
   std::pair<int, int> newPos = pos;
 
-  switch (currHeading) {
+  switch (currHead) {
   case ERR :
     abort();
-  case F :
+  case CUST_FWD :
     ++std::get<0>(newPos);
     break;
-  case B :
+  case CUST_B :
     --std::get<0>(newPos);
     break;
-  case NEG :
+  case CUST_L :
     --std::get<1>(newPos);
     break;
-  case POS :
+  case CUST_R :
     ++std::get<1>(newPos);
     break;
   case SIZE :
@@ -150,10 +139,12 @@ std::pair<int, int> Agent::UPCurrPos(std::pair<int, int> pos)
   return newPos;
 }
 
+// gen act's w/ mv info (grid ind diff & heading)
 void Agent::Backtrack()
 {
   // get backtrack pos
   std::pair<int, int> backtracked = backtrack.top();
+  // handle first time backtrack
   if (backtracked == currPos)
   {
     backtrack.pop();
@@ -165,9 +156,10 @@ void Agent::Backtrack()
   std::get<0>(diff) = std::get<0>(backtracked) - std::get<0>(currPos);
   std::get<1>(diff) = std::get<1>(backtracked) - std::get<1>(currPos);
 
-  switch (currHeading)
+  // gen new act's according to pos diff and heading
+  switch (currHead)
   {
-  case F:
+  case CUST_FWD:
     if (std::get<0>(diff))
       act[currPos].push(FORWARD);
     else if (std::get<1>(diff) == -1) {
@@ -179,7 +171,7 @@ void Agent::Backtrack()
       act[currPos].push(RIGHT);
     }
     break;
-  case POS:
+  case CUST_R:
     if (std::get<1>(diff)) {
       act[currPos].push(FORWARD);
     }
@@ -192,7 +184,7 @@ void Agent::Backtrack()
       act[currPos].push(LEFT);
     }
     break;
-  case B:
+  case CUST_B:
     if (std::get<0>(diff)) {
       act[currPos].push(FORWARD);
     }
@@ -205,7 +197,7 @@ void Agent::Backtrack()
       act[currPos].push(LEFT);
     }
     break;
-  case NEG:
+  case CUST_L:
     if (std::get<1>(diff)) {
       act[currPos].push(FORWARD);
     }
@@ -220,7 +212,7 @@ void Agent::Backtrack()
     break;
   }
 
-  // set bool
+  // set priv bool's
   isBacktracking = true;
   canTraverse = false;
 }
