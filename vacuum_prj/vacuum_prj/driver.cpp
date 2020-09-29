@@ -8,7 +8,7 @@ int main (int , char** argv) {
   Environment e("1.txt");
 
   while (!e.Done()) {
-    e.Print();
+    //e.Print();
     e.Step();
   }
   e.Print();
